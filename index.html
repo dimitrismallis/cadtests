@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Text-to-CAD Evaluation with CADTests">
+  <meta name="keywords" content="CAD, Text-to-CAD, Benchmark, Evaluation, LLM, VLLM">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Text-to-CAD Evaluation with CADTests</title>
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="./static/js/cadtests_example.js"></script>
+  <script src="./static/js/cadtests_anim.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script defer src="./static/js/stl_viewer.js"></script>
+  <script defer src="./static/js/section_nav.js"></script>
+  <script defer src="./static/js/frame_scroller.js"></script>
+  <script>
+    // Copy the BibTeX entry to the clipboard.
+    document.addEventListener('DOMContentLoaded', function() {
+      const button = document.getElementById('bibtex-copy');
+      if (!button) return;
+      button.addEventListener('click', function() {
+        const text = document.getElementById('bibtex-entry').innerText;
+        navigator.clipboard.writeText(text).then(function() {
+          button.querySelector('span:last-child').textContent = 'Copied';
+          setTimeout(function() { button.querySelector('span:last-child').textContent = 'Copy'; }, 1500);
+        });
+      });
+    });
+  </script>
+
+  <style>
+    .cad-mono {
+      font-family: 'Courier New', 'Monaco', 'Consolas', monospace;
+      font-weight: bold;
+    }
+
+    .title-container {
+      padding-top: 1rem;
+    }
+    .title-flex {
+      width: 100%;
+      justify-content: center;
+      align-items: center;
+      display: flex;
+      flex-direction: column;
+    }
+    .cad-title-sub {
+      font-family: 'Google Sans', 'Noto Sans', 'Castoro', serif;
+      font-size: 2.5rem;
+      font-weight: bold;
+      margin-top: 8px;
+      text-align: center;
+    }
+    @media (max-width: 768px) {
+      .cad-title-sub {
+        font-size: 1.5rem;
+      }
+    }
+
+    .advantage-card {
+      height: 100%;
+      padding: 1.5rem;
+      border-radius: 12px;
+      background-color: rgb(246, 246, 255);
+      border: 1px solid rgb(225, 225, 245);
+      text-align: center;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .advantage-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 20px rgba(60, 60, 140, 0.12);
+    }
+    .advantage-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 3rem;
+      height: 3rem;
+      border-radius: 50%;
+      background-color: #363636;
+      color: #fff;
+      font-size: 1.25rem;
+      margin-bottom: 0.75rem;
+    }
+    .advantage-card h4 {
+      font-family: 'Google Sans', 'Noto Sans', 'Castoro', serif;
+      font-size: 1.15rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+    .advantage-card p {
+      color: #4a4a4a;
+      font-size: 0.95rem;
+    }
+
+    /* CADTests in action */
+    .cadtests-track {
+      position: relative;
+    }
+    /* The stage's sticky top is set in JS so it pins only once the whole stage is in view. */
+    .cadtests-stage {
+      position: sticky;
+      top: 0;
+      padding: 3rem 1.5rem;
+      background-color: #fff;
+    }
+    /* Height is set in JS to match the prompt + model column. */
+    .cadtests-window {
+      position: relative;
+      overflow: hidden;
+      padding: 0.5rem;
+      margin: -0.5rem;
+    }
+    /* Positioned every frame from the scroll position, so no transition here. */
+    #cadtests-list {
+      will-change: transform;
+    }
+    .cadtests-label {
+      font-family: 'Google Sans', 'Noto Sans', 'Castoro', serif;
+      font-weight: bold;
+      font-size: 1.1rem;
+      margin-bottom: 0.4rem;
+    }
+    .cadtests-prompt {
+      font-style: italic;
+      font-size: 0.95rem;
+      color: #4a4a4a;
+      text-align: justify;
+      margin-bottom: 1.25rem;
+    }
+    .cadtests-model {
+      width: 100%;
+      height: 260px;
+      margin-bottom: 1rem;
+      cursor: grab;
+    }
+    .cadtests-model:active { cursor: grabbing; }
+    .cadtests-model canvas { display: block; }
+    .cadtests-counter {
+      text-align: center;
+      font-size: 0.9rem;
+      color: #7a7a7a;
+      margin-bottom: 0.75rem;
+    }
+    .cadtests-summary {
+      text-align: center;
+      padding: 0.5rem 1rem;
+      border-radius: 10px;
+      border: 2px solid #363636;
+      font-size: 1.1rem;
+      opacity: 0;
+      transform: scale(0.9);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    .cadtests-summary.is-shown { opacity: 1; transform: scale(1); }
+    .cadtests-summary.is-pass { background-color: #85e89d; }
+    .cadtests-summary.is-fail { background-color: #ff9fb0; }
+
+    .cadtest-card {
+      margin-bottom: 1.5rem;
+      border-radius: 12px;
+      border: 1px solid rgb(225, 225, 245);
+      background-color: #fff;
+      box-shadow: 0 4px 14px rgba(60, 60, 140, 0.08);
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.6s ease, transform 0.6s ease, border-color 0.4s ease;
+    }
+    .cadtest-card.is-visible { opacity: 1; transform: translateY(0); }
+    .cadtest-card.has-passed { border-color: #34a853; }
+    .cadtest-card.has-failed { border-color: #d93025; }
+    .cadtest-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.75rem 1rem;
+      background-color: rgb(246, 246, 255);
+    }
+    .cadtest-index {
+      font-family: 'Courier New', 'Monaco', 'Consolas', monospace;
+      font-weight: bold;
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+    .cadtest-heading {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.2rem;
+    }
+    .cadtest-type {
+      font-family: 'Courier New', 'Monaco', 'Consolas', monospace;
+      font-size: 0.7rem;
+      padding: 0 0.4rem;
+      border-radius: 4px;
+      background-color: rgb(225, 225, 245);
+      color: #4a4a8a;
+    }
+    .cadtest-type:empty { display: none; }
+    .cadtest-title {
+      font-size: 0.9rem;
+      font-style: italic;
+    }
+    .cadtest-status {
+      font-size: 0.8rem;
+      font-weight: bold;
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .cadtest-status.is-pending { background-color: #ededed; color: #7a7a7a; }
+    .cadtest-status.is-running { background-color: #fff3c4; color: #8a6d00; }
+    .cadtest-status.is-pass { background-color: #85e89d; color: #0b4f1c; }
+    .cadtest-status.is-fail { background-color: #ff9fb0; color: #7a0a1d; }
+    .cadtest-spinner {
+      width: 0.7rem;
+      height: 0.7rem;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      border-radius: 50%;
+      animation: cadtest-spin 0.7s linear infinite;
+    }
+    @keyframes cadtest-spin { to { transform: rotate(360deg); } }
+    .cadtest-card pre {
+      margin: 0;
+      padding: 0.9rem 1rem;
+      font-size: 0.78rem;
+      background-color: #fff;
+      overflow: auto;
+      /* Long tests scroll inside the card so every card fits the test window. */
+      max-height: 15rem;
+    }
+    .cadtest-card pre code.hljs { padding: 0; background: transparent; }
+    .cadtest-log {
+      font-family: 'Courier New', 'Monaco', 'Consolas', monospace;
+      font-size: 0.8rem;
+      padding: 0.6rem 1rem;
+      border-top: 1px dashed rgb(225, 225, 245);
+      /* Space is reserved up front so cards never change height when the log appears. */
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    .cadtest-card.has-passed .cadtest-log,
+    .cadtest-card.has-failed .cadtest-log {
+      opacity: 1;
+    }
+    .cadtest-card.has-passed .cadtest-log { color: #1e7e34; }
+    .cadtest-card.has-failed .cadtest-log { color: #b00020; }
+    /* On phones the stage does not pin; cards reveal as they scroll into view. */
+    @media (max-width: 768px) {
+      #cadtests-demo { padding: 3rem 1.5rem; }
+      .cadtests-stage { position: static; padding: 0; }
+      .cadtests-window { height: auto; overflow: visible; }
+    }
+
+    /* Section spacing: one rule for every section so the gaps stay even. */
+    .section {
+      padding-top: 4.5rem;
+      padding-bottom: 4.5rem;
+    }
+    /* The scroll-animated sections pad outside their tracks, so pinning is unaffected. */
+    #cadtests-demo,
+    #framework {
+      padding: 3rem 0;
+    }
+    @media (max-width: 768px) {
+      .section {
+        padding-top: 3rem;
+        padding-bottom: 3rem;
+      }
+      /* Unpinned on phones, so this section needs its own side padding. */
+      #cadtests-demo { padding: 2rem 1.5rem; }
+    }
+
+    /* Sticky section navigation */
+    html {
+      scroll-behavior: smooth;
+      /* Anchored sections land below the sticky bar. */
+      scroll-padding-top: 3.5rem;
+    }
+    .section-nav {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      background-color: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(6px);
+      border-bottom: 1px solid rgb(235, 235, 245);
+    }
+    .section-nav-inner {
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+    }
+    .section-nav-links {
+      display: flex;
+      align-items: stretch;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .section-nav-links::-webkit-scrollbar { display: none; }
+    .section-link {
+      white-space: nowrap;
+      color: #7a7a7a;
+    }
+    a.navbar-item.section-link:focus:not(:hover) {
+      color: #7a7a7a;
+      background-color: transparent;
+    }
+    a.navbar-item.section-link.is-active,
+    a.navbar-item.section-link.is-active:focus {
+      color: #363636;
+      font-weight: bold;
+      box-shadow: inset 0 -2px 0 #363636;
+    }
+    /* Like the original menu, "More Projects" only shows on desktop. */
+    @media (max-width: 1023px) {
+      .more-projects { display: none; }
+      .section-nav-inner { justify-content: flex-start; }
+    }
+
+    /* Framework frame animation */
+    .framework-track {
+      position: relative;
+    }
+    /* The stage's sticky top is set in JS so it pins only once the whole stage is in view. */
+    .framework-stage {
+      position: sticky;
+      top: 0;
+      padding: 1.25rem 1.5rem;
+      background-color: #fff;
+    }
+    .framework-stack {
+      position: relative;
+      aspect-ratio: 2400 / 1548;
+      /* As wide as possible while the whole diagram still fits under the top bar. */
+      width: min(100%, calc((100vh - 12rem) * 2400 / 1548));
+      margin: 0 auto;
+    }
+    .framework-frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+    }
+    .framework-frame:first-child,
+    .framework-frame.is-shown {
+      opacity: 1;
+    }
+    .framework-dots {
+      display: flex;
+      justify-content: center;
+      gap: 0.4rem;
+      margin-top: 1rem;
+    }
+    .framework-dot {
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      background-color: rgb(225, 225, 245);
+      transition: background-color 0.3s ease, transform 0.3s ease;
+    }
+    .framework-dot.is-active {
+      background-color: #363636;
+      transform: scale(1.3);
+    }
+
+    /* Results table */
+    .results-caption {
+      max-width: 48rem;
+      margin: 0 auto 1.5rem;
+      text-align: center;
+      color: #4a4a4a;
+    }
+    /* On narrow screens the table scrolls sideways inside its box. */
+    .results-scroll {
+      overflow-x: auto;
+    }
+    .results-table {
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+    /* Doubled class so these win over Bulma's own .table alignment rules. */
+    .table.results-table th,
+    .table.results-table td {
+      text-align: center;
+      vertical-align: middle;
+    }
+    .table.results-table thead tr:first-child th:nth-child(-n+2),
+    .table.results-table td:first-child,
+    .table.results-table td:nth-child(2) {
+      text-align: left;
+    }
+    .results-table thead th {
+      border-bottom-width: 1px;
+    }
+    .results-table thead tr:last-child th {
+      border-bottom: 2px solid #363636;
+    }
+    .results-partition {
+      font-style: italic;
+      font-weight: normal;
+    }
+    .results-split {
+      border-left: 1px solid rgb(225, 225, 245);
+    }
+    .results-table code {
+      font-size: 0.8rem;
+      color: #4a4a8a;
+      background-color: rgb(240, 240, 250);
+    }
+    .results-group td {
+      text-align: left !important;
+      font-style: italic;
+      font-weight: bold;
+      text-decoration: underline;
+      padding-top: 1rem;
+    }
+    .results-table tr.is-ours td {
+      background-color: rgb(246, 246, 255);
+    }
+
+    /* Interactive demo */
+    .demo-caption {
+      max-width: 48rem;
+      margin: 0 auto 1.5rem;
+      text-align: center;
+      color: #4a4a4a;
+    }
+    .demo-frame {
+      border-radius: 12px;
+      border: 1px solid rgb(225, 225, 245);
+      box-shadow: 0 4px 14px rgba(60, 60, 140, 0.08);
+      overflow: hidden;
+      /* Tall enough to use the viewer, but leaves the top bar and some page visible. */
+      height: max(560px, calc(100vh - 10rem));
+    }
+    .demo-frame iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+    .demo-open {
+      margin-top: 1rem;
+    }
+
+    /* BibTeX */
+    .bibtex-box {
+      position: relative;
+    }
+    .bibtex-box pre {
+      padding: 1.25rem 1.5rem;
+      border-radius: 10px;
+      border: 1px solid rgb(225, 225, 245);
+      background-color: rgb(246, 246, 255);
+      font-size: 0.85rem;
+      /* Wrap long fields and keep text clear of the Copy button. */
+      white-space: pre-wrap;
+      padding-right: 6rem;
+    }
+    .bibtex-copy {
+      position: absolute;
+      top: 0.6rem;
+      right: 0.6rem;
+    }
+
+    .ack-logos {
+      display: block;
+      width: 100%;
+      max-width: 560px;
+      margin: 1.5rem auto 0;
+    }
+
+    /* Bulma's negative column margins made the footer wider than a phone screen. */
+    .footer .columns {
+      margin-left: 0;
+      margin-right: 0;
+    }
+
+    /* Fix navbar dropdown hover height */
+    .navbar-dropdown {
+      min-height: auto !important;
+      max-height: none !important;
+    }
+    .navbar-dropdown .navbar-item {
+      padding: 0.5rem 1rem !important;
+      min-height: auto !important;
+      line-height: 1.5 !important;
+    }
+    .navbar-dropdown .navbar-item:hover {
+      background-color: #f5f5f5 !important;
+    }
+  </style>
+</head>
+<body>
+  <!-- Top Navigation Menu: stays visible while scrolling and links to each section. -->
+  <nav class="navbar section-nav" id="section-nav" role="navigation" aria-label="main navigation">
+    <div class="container is-max-desktop section-nav-inner">
+      <div class="section-nav-links">
+        <a class="navbar-item" href="#" title="Home">
+          <span class="icon">
+              <i class="fas fa-home"></i>
+          </span>
+        </a>
+        <a class="navbar-item section-link" href="#tldr">TL;DR</a>
+        <a class="navbar-item section-link" href="#abstract">Abstract</a>
+        <a class="navbar-item section-link" href="#cadtests-demo"><span class="cad-mono">CADTests</span>&nbsp;in Action</a>
+        <a class="navbar-item section-link" href="#advantages">Advantages</a>
+        <a class="navbar-item section-link" href="#framework">Iterative Refinement</a>
+        <a class="navbar-item section-link" href="#results">Results</a>
+        <a class="navbar-item section-link" href="#demo">Demo</a>
+        <a class="navbar-item section-link" href="#bibtex">BibTeX</a>
+      </div>
+
+      <div class="navbar-item has-dropdown is-hoverable more-projects">
+        <a class="navbar-link">
+          More Projects
+        </a>
+        <div class="navbar-dropdown is-right">
+          <a class="navbar-item" href="https://cadassistant.github.io/">
+            CAD-Assistant
+          </a>
+          <a class="navbar-item" href="https://morfis.ai/">
+            Morfis
+          </a>
+          <a class="navbar-item" href="https://github.com/filaPro/cad-recode">
+            CAD Recode
+          </a>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <!-- End Top Menu -->
+
+  <!-- Title Section -->
+  <div class="container is-max-desktop title-container">
+    <div class="navbar-brand title-flex">
+      <span class="cad-title-sub">Text-to-CAD Evaluation with <span class="cad-mono">CADTests</span></span>
+    </div>
+  </div>
+  <!-- End Title Section -->
+
+  <section class="hero" style="margin-top: 0rem; margin-bottom: -1rem;">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered">
+          <div class="column has-text-centered">
+            <div class="is-size-5 publication-authors">
+              <span class="author-block">
+                <a href="https://dimitrismallis.github.io/">Dimitrios Mallis</a><sup>1</sup>,</span>
+              <span class="author-block">
+                <a href="https://marcowang.tech/">Marco Wang</a><sup>1</sup>,</span>
+              <span class="author-block">
+                <a href="https://askaradeniz.github.io/">Ahmet Serdar Karadeniz</a><sup>1</sup>,</span>
+              <span class="author-block">
+                <a href="https://eliricci.eu/">Elisa Ricci</a><sup>2,3</sup>,</span>
+              <span class="author-block">
+                <a href="https://www.uni.lu/en/person/NTAwMzU1NDVfX0FuaXMgS0FDRU0=/">Anis Kacem</a><sup>1</sup>,</span>
+              <span class="author-block">
+                <a href="https://www.uni.lu/snt-en/people/djamila-aouada/">Djamila Aouada</a><sup>1</sup></span>
+            </div>
+
+            <div class="is-size-6 publication-authors">
+              <span class="author-block">SnT, University of Luxembourg<sup>1</sup></span>
+              <span class="author-block">University of Trento<sup>2</sup></span>
+              <span class="author-block">Fondazione Bruno Kessler<sup>3</sup></span>
+            </div>
+
+            <div class="column has-text-centered">
+              <div class="publication-links">
+                <span class="link-block">
+                  <a href="https://arxiv.org/abs/2605.07807"
+                     class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                        <i class="ai ai-arxiv"></i>
+                    </span>
+                    <span>arXiv</span>
+                  </a>
+                </span>
+                <span class="link-block">
+                  <a href="https://github.com/dimitrismallis/CADTestBench"
+                     class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                        <i class="fab fa-github"></i>
+                    </span>
+                    <span>Code</span>
+                  </a>
+                </span>
+                <span class="link-block">
+                  <a href="https://huggingface.co/datasets/dimitrismallis/CADTestBench"
+                     class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">🤗</span>
+                    <span>Dataset</span>
+                  </a>
+                </span>
+                <span class="link-block">
+                  <a href="#demo"
+                     class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                        <i class="fas fa-cube"></i>
+                    </span>
+                    <span>Demo</span>
+                  </a>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Accepted at NeurIPS'26 Evaluation Track</h2>
+          <div class="content has-text-centered">
+            <div class="columns is-centered">
+              <div class="column is-half">
+                <img src="./static/images/neurips-logo.svg" alt="NeurIPS 2026" style="width: 100%; max-width: 300px; display: block; margin: 0 auto;">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="tldr">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">TL;DR</h2>
+          <div class="content has-text-centered">
+            <p style="font-size: 1.1rem;">
+              <span class="cad-mono">CADTestBench</span> is the first test-based benchmark for Text-to-CAD, based on
+              <span class="cad-mono">CADTests</span>, executable software tests operating directly on the CAD Model (B-Rep) that verify whether a generated CAD model
+              satisfies the geometric and topological requirements of the input prompt.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="columns is-centered">
+        <div class="column is-full-width">
+          <img src="./static/images/teaser.png" alt="CADTestBench teaser" style="width: 100%; display: block;">
+          <p class="has-text-centered" style="margin-top: 1rem;">
+            <span class="cad-mono">CADTests</span> can account for ambiguous design prompts (left) and identify subtle
+            structural errors (right).
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section is-light" id="abstract" style="background-color: rgb(246, 246, 255);">
+    <div class="container is-max-desktop">
+      <!-- Abstract. -->
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Abstract</h2>
+          <div class="content has-text-justified">
+            <p>
+              Text-to-CAD has emerged as an important task with the potential to substantially accelerate design workflows.
+              Despite its significance, there has been surprisingly little work on Text-to-CAD evaluation, and assessing CAD
+              model generation performance remains a considerable challenge. In this work, we introduce a new evaluation
+              perspective for Text-to-CAD based on <em>automated testing</em>. We propose <span class="cad-mono">CADTestBench</span>,
+              the first <em>test-based</em> benchmark for Text-to-CAD, based on <span class="cad-mono">CADTests</span>, executable
+              software tests that verify whether a generated CAD model satisfies the geometric and topological requirements of
+              the input prompt. Using <span class="cad-mono">CADTestBench</span>, we conduct comprehensive benchmarking of recent
+              Text-to-CAD methods and further demonstrate that <span class="cad-mono">CADTests</span> can also guide CAD model
+              generation, yielding simple baselines that surpass performance of current methods.
+              The <span class="cad-mono">CADTestBench</span> dataset and code are publicly available.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CADTests in action: the stage pins to the viewport and scrolling inside the track drives the tests. -->
+  <section id="cadtests-demo">
+    <div id="cadtests-track" class="cadtests-track">
+      <div class="cadtests-stage">
+        <div class="container is-max-desktop">
+          <h2 class="title is-3 has-text-centered"><span class="cad-mono">CADTests</span> in Action</h2>
+          <div class="columns">
+            <div class="column is-5">
+              <div id="cadtests-left">
+                <h4 class="cadtests-label">Prompt</h4>
+                <p id="cadtests-prompt" class="cadtests-prompt"></p>
+                <h4 class="cadtests-label">Generated model</h4>
+                <div id="cadtests-model" class="cadtests-model" title="Drag to rotate"></div>
+                <p id="cadtests-counter" class="cadtests-counter"></p>
+                <div id="cadtests-summary" class="cadtests-summary"></div>
+              </div>
+            </div>
+            <div class="column is-7">
+              <div id="cadtests-window" class="cadtests-window">
+                <div id="cadtests-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="advantages">
+    <div class="container is-max-desktop">
+      <!-- Advantages. -->
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-full-width">
+          <h2 class="title is-3">Advantages of <span class="cad-mono">CADTests</span></h2>
+        </div>
+      </div>
+      <div class="columns is-multiline is-centered">
+        <div class="column is-one-third">
+          <div class="advantage-card">
+            <span class="advantage-icon"><i class="fas fa-link-slash"></i></span>
+            <h4>Reference-free</h4>
+            <p>Assess prompt compliance directly, rather than via alignment with a ground-truth solution.</p>
+          </div>
+        </div>
+        <div class="column is-one-third">
+          <div class="advantage-card">
+            <span class="advantage-icon"><i class="fas fa-list-check"></i></span>
+            <h4>Explicit verification</h4>
+            <p>Every dimension and structural specification is treated as a strict constraint.</p>
+          </div>
+        </div>
+        <div class="column is-one-third">
+          <div class="advantage-card">
+            <span class="advantage-icon"><i class="fas fa-magnifying-glass"></i></span>
+            <h4>Interpretable</h4>
+            <p>Failing tests return explicit log messages describing the cause of failure.</p>
+          </div>
+        </div>
+        <div class="column is-one-third">
+          <div class="advantage-card">
+            <span class="advantage-icon"><i class="fas fa-bolt-lightning"></i></span>
+            <h4>Efficient</h4>
+            <p>Fast and deterministic, avoiding the inference costs of learnable semantic evaluators.</p>
+          </div>
+        </div>
+        <div class="column is-one-third">
+          <div class="advantage-card">
+            <span class="advantage-icon"><i class="fas fa-scale-balanced"></i></span>
+            <h4>Consistent</h4>
+            <p>Handle invalid generations without aggregating scores on method-specific subsets.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Iterative Refinement Framework: the stage pins below the top bar and scrolling steps through the frames. -->
+  <section id="framework">
+    <div id="framework-track" class="framework-track">
+      <div class="framework-stage">
+        <div class="container is-max-widescreen">
+          <h2 class="title is-3 has-text-centered">Iterative Refinement Framework</h2>
+          <div class="framework-stack">
+              <img class="framework-frame" src="./static/images/framework/frame-01.jpg" alt="Framework step 1 of 10">
+              <img class="framework-frame" src="./static/images/framework/frame-02.jpg" alt="Framework step 2 of 10">
+              <img class="framework-frame" src="./static/images/framework/frame-03.jpg" alt="Framework step 3 of 10">
+              <img class="framework-frame" src="./static/images/framework/frame-04.jpg" alt="Framework step 4 of 10">
+              <img class="framework-frame" src="./static/images/framework/frame-05.jpg" alt="Framework step 5 of 10">
+              <img class="framework-frame" src="./static/images/framework/frame-06.jpg" alt="Framework step 6 of 10">
+              <img class="framework-frame" src="./static/images/framework/frame-07.jpg" alt="Framework step 7 of 10">
+              <img class="framework-frame" src="./static/images/framework/frame-08.jpg" alt="Framework step 8 of 10">
+              <img class="framework-frame" src="./static/images/framework/frame-09.jpg" alt="Framework step 9 of 10">
+              <img class="framework-frame" src="./static/images/framework/frame-10.jpg" alt="Framework step 10 of 10">
+          </div>
+          <div class="framework-dots">
+              <span class="framework-dot"></span>
+              <span class="framework-dot"></span>
+              <span class="framework-dot"></span>
+              <span class="framework-dot"></span>
+              <span class="framework-dot"></span>
+              <span class="framework-dot"></span>
+              <span class="framework-dot"></span>
+              <span class="framework-dot"></span>
+              <span class="framework-dot"></span>
+              <span class="framework-dot"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Results. -->
+  <section class="section" id="results">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered">Results</h2>
+      <p class="results-caption">
+        Evaluation of Text-to-CAD methods on <span class="cad-mono">CADTestBench</span>. Results are reported for both the
+        abstract and detailed partitions. Text-to-CAD baselines are evaluated using different LLM planners. Performance is
+        measured in terms of pass rate (PR), requirement score (RS), and invalidity rate (IR).
+      </p>
+      <div class="results-scroll">
+        <table class="table is-fullwidth results-table">
+          <thead>
+            <tr>
+              <th rowspan="2">Method</th>
+              <th rowspan="2">Planner</th>
+              <th colspan="3" class="results-partition">Detailed</th>
+              <th colspan="3" class="results-partition results-split">Abstract</th>
+            </tr>
+            <tr>
+              <th>IR&nbsp;&darr;</th><th>RS&nbsp;&uarr;</th><th>PR&nbsp;&uarr;</th>
+              <th class="results-split">IR&nbsp;&darr;</th><th>RS&nbsp;&uarr;</th><th>PR&nbsp;&uarr;</th>
+            </tr>
+          </thead>
+          <tbody>
+                <tr class="results-group"><td colspan="8">Finetuned Method</td></tr>
+                <tr><td>Text2CAD</td><td>&ndash;</td><td>0.005</td><td>0.405</td><td>0.025</td><td class="results-split">0.015</td><td>0.603</td><td>0.085</td></tr>
+                <tr class="results-group"><td colspan="8">Train-Free Methods</td></tr>
+                <tr><td>CadCodeVerify</td><td><code>GPT-4.1</code></td><td>0.025</td><td>0.794</td><td>0.410</td><td class="results-split">0.040</td><td>0.880</td><td>0.630</td></tr>
+                <tr><td>10-shots</td><td><code>GPT-5.2</code></td><td>0.175</td><td>0.718</td><td>0.465</td><td class="results-split">0.210</td><td>0.742</td><td>0.580</td></tr>
+                <tr><td>Skilled</td><td><code>GPT-5.2</code></td><td>0.190</td><td>0.688</td><td>0.430</td><td class="results-split">0.180</td><td>0.766</td><td>0.600</td></tr>
+                <tr><td>ReAct</td><td><code>DeepSeek-V3</code></td><td>0.035</td><td>0.752</td><td>0.370</td><td class="results-split">0.005</td><td>0.821</td><td>0.390</td></tr>
+                <tr><td>ReAct</td><td><code>Qwen3-Coder-480B</code></td><td>0.025</td><td>0.793</td><td>0.425</td><td class="results-split">0.010</td><td>0.881</td><td>0.605</td></tr>
+                <tr><td>ReAct</td><td><code>GPT-5.2</code></td><td>0.000</td><td>0.835</td><td>0.480</td><td class="results-split">0.005</td><td>0.916</td><td>0.695</td></tr>
+                <tr><td>ReAct + Image</td><td><code>GPT-5.2</code></td><td>0.025</td><td>0.822</td><td>0.485</td><td class="results-split">0.005</td><td>0.916</td><td>0.695</td></tr>
+                <tr><td>10-shots</td><td><code>Claude-4.6-Sonnet</code></td><td>0.155</td><td>0.744</td><td>0.510</td><td class="results-split">0.115</td><td>0.830</td><td>0.640</td></tr>
+                <tr><td>Skilled</td><td><code>Claude-4.6-Sonnet</code></td><td>0.185</td><td>0.727</td><td>0.505</td><td class="results-split">0.130</td><td>0.810</td><td>0.640</td></tr>
+                <tr><td>ReAct</td><td><code>Claude-4.6-Sonnet</code></td><td>0.000</td><td>0.874</td><td>0.580</td><td class="results-split">0.000</td><td>0.929</td><td>0.715</td></tr>
+                <tr class="results-group"><td colspan="8">Test-based Baselines</td></tr>
+                <tr class="is-ours"><td><span class="cad-mono">CADTests</span></td><td><code>GPT-5.2</code></td><td>0.020</td><td>0.824</td><td>0.500</td><td class="results-split">0.015</td><td>0.925</td><td>0.720</td></tr>
+                <tr class="is-ours"><td><span class="cad-mono">CADTests</span> + Log</td><td><code>GPT-5.2</code></td><td>0.015</td><td>0.852</td><td>0.515</td><td class="results-split">0.020</td><td>0.922</td><td>0.700</td></tr>
+                <tr class="is-ours"><td><span class="cad-mono">CADTests</span></td><td><code>Claude-4.6-Sonnet</code></td><td>0.005</td><td>0.882</td><td>0.590</td><td class="results-split">0.000</td><td>0.953</td><td>0.765</td></tr>
+                <tr class="is-ours"><td><span class="cad-mono">CADTests</span> + Log</td><td><code>Claude-4.6-Sonnet</code></td><td>0.000</td><td><strong>0.897</strong></td><td><strong>0.625</strong></td><td class="results-split">0.000</td><td><strong>0.962</strong></td><td><strong>0.810</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive demo: the CADTestBench viewer, embedded. -->
+  <section class="section" id="demo">
+    <div class="container is-max-widescreen">
+      <h2 class="title is-3 has-text-centered">Interactive Demo</h2>
+      <p class="demo-caption">
+        Browse <span class="cad-mono">CADTestBench</span> samples with their generated models, code and <span class="cad-mono">CADTests</span>.
+        It opens on the <span class="cad-mono">CADTests</span> Claude-4.6-Sonnet run; pick another preloaded experiment and press <strong>Load</strong> to switch.
+      </p>
+      <div class="demo-frame">
+        <iframe src="https://cadtestbench-viewer.vercel.app/" title="CADTestBench Viewer" loading="lazy"
+                allow="fullscreen" referrerpolicy="no-referrer"></iframe>
+      </div>
+      <div class="has-text-centered demo-open">
+        <a href="https://cadtestbench-viewer.vercel.app/" target="_blank" rel="noopener"
+           class="external-link button is-normal is-rounded is-dark">
+          <span class="icon"><i class="fas fa-up-right-from-square"></i></span>
+          <span>Open in new tab</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Citation. -->
+  <section class="section" id="bibtex">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered">BibTeX</h2>
+      <div class="bibtex-box">
+        <button class="button is-small bibtex-copy" id="bibtex-copy" type="button">
+          <span class="icon"><i class="fas fa-copy"></i></span>
+          <span>Copy</span>
+        </button>
+        <pre id="bibtex-entry"><code>@inproceedings{mallis2026cadtests,
+  title={Text-to-CAD Evaluation with CADTests},
+  author={Dimitrios Mallis and Marco Wang and Ahmet Serdar Karadeniz and Elisa Ricci and Anis Kacem and Djamila Aouada},
+  booktitle={Advances in Neural Information Processing Systems (NeurIPS)},
+  year={2026}
+}</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Acknowledgements. -->
+  <section class="section" id="acknowledgements">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Acknowledgements</h2>
+          <div class="content has-text-centered">
+            <p>
+              This work is supported by the National Research Fund (FNR), Luxembourg, under the
+              BRIDGES2021/IS/16849599/FREE-3D project and the JUMP2025/19750191/Morfis project.
+            </p>
+            <img src="./static/images/ack_logos.png" alt="University of Luxembourg, SnT and Luxembourg National Research Fund logos" class="ack-logos">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column is-8-desktop is-12-mobile">
+          <div class="content">
+            <p class="has-text-centered-mobile">
+              This website is licensed under a <a rel="license"
+                href="http://creativecommons.org/licenses/by-sa/4.0/">Creative
+                Commons Attribution-ShareAlike 4.0 International License</a>.
+            </p>
+            <p class="has-text-centered-mobile">
+              This means you are free to borrow the <a href="https://github.com/nerfies/nerfies.github.io">source
+                code</a> of this website,
+              we just ask that you link back to this page in the footer.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
